@@ -51,8 +51,71 @@ const Checkout = ({ cart, getTotalPrice, createOrder, setCurrentPage, currentUse
     setCustomerInfo(prev => ({ ...prev, [name]: value }))
   }
 
-  // React ví dụ
-  async function createPayment({ orderId, amount, orderInfo }) {
+  // Hàm gọi BE tạo link thanh toán ZaloPay
+  async function createZaloPayPayment({ orderId, amount, orderInfo, items }) {
+    console.log("[ZALOPAY][createPayment] orderId:", orderId, "amount:", amount)
+
+    const res = await fetch("http://localhost:8081/api/payment/zalopay/create-qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items,
+        description: orderInfo,
+        amount,
+      }),
+    })
+    console.log("[ZALOPAY][createPayment] fetch done, res:", res)
+    if (!res.ok) {
+      const txt = await res.text()
+      console.error("[ZALOPAY][createPayment] BE error body:", txt)
+      throw new Error("Tạo thanh toán ZaloPay thất bại")
+    }
+
+    const data = await res.json()
+    console.log("[ZALOPAY][createPayment] response:", data)
+
+    if (data.order_url) {
+      window.location.replace(data.order_url) // sửa từ payUrl → order_url
+    } else if (data.qr_code) {
+      window.open(data.qr_code, "_blank")
+    } else {
+      throw new Error("Không nhận được link thanh toán ZaloPay")
+    }
+  }
+
+
+  // Hàm gọi BE tạo QR thanh toán MoMo
+  async function createMomoPayment({ orderId, amount, orderInfo }) {
+    console.log("[MOMO][createPayment] orderId:", orderId, "amount:", amount, "orderInfo:", orderInfo)
+    const res = await fetch("http://localhost:8081/api/payment/momo/create-qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId,
+        amount,
+        orderInfo,
+      }),
+    })
+    if (!res.ok) {
+      const txt = await res.text()
+      console.error("[MOMO][createPayment] BE error body:", txt)
+      throw new Error("Tạo thanh toán MoMo thất bại")
+    }
+    const data = await res.json()
+    console.log("[MOMO][createPayment] response:", data)
+
+    // MoMo trả về resultCode + payUrl (deeplink hoặc qr)
+    if (data?.payUrl) {
+      window.location.replace(data.payUrl)
+    } else if (data?.deeplink) {
+      window.location.replace(data.deeplink)
+    } else {
+      throw new Error("Không nhận được link thanh toán MoMo")
+    }
+  }
+
+  // Hàm gọi BE tạo link thanh toán VNPAY và redirect
+  async function createVNPayPayment({ orderId, amount, orderInfo }) {
     console.log("[VNPAY][createPayment] orderId:", orderId, "amount:", amount, "orderInfo:", orderInfo)
     const res = await fetch("http://localhost:8081/api/payment/vnpay/create-qr", {
       method: "POST",
@@ -71,7 +134,7 @@ const Checkout = ({ cart, getTotalPrice, createOrder, setCurrentPage, currentUse
     const data = await res.json()
     console.log("[VNPAY][createPayment] response:", data)
     if (data.payUrl) {
-      window.location.href = data.payUrl
+      window.location.replace(data.payUrl)
     } else {
       throw new Error("Không nhận được link thanh toán")
     }
@@ -174,24 +237,42 @@ const Checkout = ({ cart, getTotalPrice, createOrder, setCurrentPage, currentUse
       }
 
       // 4. Nếu COD / BANK / MOMO thì giữ flow cũ
-      if (paymentMethod !== "vnpay") {
+      if (paymentMethod !== "vnpay" && paymentMethod !== "momo" && paymentMethod !== "zalopay") {
         alert(`Đặt hàng thành công! Mã đơn hàng: ${order.id}`)
         navigate("/orders", { replace: true })
         if (typeof setCurrentPage === "function") setCurrentPage("home")
         return
       }
+      if (paymentMethod === "momo") {
+        await createMomoPayment({
+          orderId: order.id,
+          amount: order.total || payload.total_amount,
+          orderInfo: `Thanh toán đơn hàng ${order.id}`,
+        })
+        return
+      }
+
+
+      if (paymentMethod == "vnpay") {
+        await createVNPayPayment({
+          orderId: order.id,
+          amount: order.total || payload.total_amount,
+          orderInfo: `Thanh toán đơn hàng ${order.id}`,
+        })
+      }
+      // NEW: chuyển sang trang xử lý VNPAY
+      if (paymentMethod === "zalopay") {
+        await createZaloPayPayment({
+          orderId: order.id,
+          amount: order.total || payload.total_amount,
+          orderInfo: `Thanh toán đơn hàng ${order.id}`,
+          items: payload.items,
+        })
+        return
+      }
       console.log("paymentMethod", paymentMethod)
       console.log("payload gửi BE:", payload)
       console.log("order BE trả về:", order)
-
-
-      // NEW: chuyển sang trang xử lý VNPAY
-      await createPayment({
-        orderId: order.id,
-        amount: order.total || payload.total_amount,
-        orderInfo: `Thanh toán đơn hàng ${order.id}`,
-      })
-
     } catch (err) {
       console.error("Checkout error:", err)
       alert(err.message || "Có lỗi khi thanh toán")
@@ -365,6 +446,21 @@ const Checkout = ({ cart, getTotalPrice, createOrder, setCurrentPage, currentUse
             </div>
           </label>
 
+          <label className="flex items-center">
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="zalopay"
+              checked={paymentMethod === "zalopay"}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="mr-3"
+            />
+            <div>
+              <div className="font-medium">ZaloPay</div>
+              <div className="text-sm text-gray-600">Thanh toán qua ví ZaloPay</div>
+            </div>
+          </label>
+
           {/* NEW: VNPAY */}
           <label className="flex items-center">
             <input
@@ -376,9 +472,9 @@ const Checkout = ({ cart, getTotalPrice, createOrder, setCurrentPage, currentUse
               className="mr-3"
             />
             <div>
-              <div className="font-medium">VNPAY (Sandbox)</div>
+              <div className="font-medium">VNPAY</div>
               <div className="text-sm text-gray-600">
-                Chuyển hướng đến cổng thanh toán VNPAY (test)
+                Thanh toán qua ví VNPAY
               </div>
             </div>
           </label>

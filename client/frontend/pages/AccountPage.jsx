@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useAppContext } from "../contexts/AppContext"
 
 const AccountPage = () => {
-  const { currentUser, updateUser, deleteUser, handleLogout, getCartCount } = useAppContext()
+  const { currentUser, updateUser, deleteUser, handleLogout, handleChangePassword } = useAppContext()
 
   const [form, setForm] = useState({
     first_name: currentUser?.first_name || "",
@@ -28,8 +28,7 @@ const AccountPage = () => {
     console.log("Updated user info:", form)
     alert("Cập nhật thông tin thành công")
   }
-
-  const handleChangePassword = (e) => {
+  const handleChangePassword1 = async (e) => {
     e.preventDefault()
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -42,21 +41,27 @@ const AccountPage = () => {
       return
     }
 
-    // Call API to change password
-    // This would need to be implemented in your context/hooks
-    console.log("Changing password:", {
-      currentPassword: passwordForm.currentPassword,
-      newPassword: passwordForm.newPassword
-    })
-
-    alert("Đổi mật khẩu thành công")
-    setShowChangePassword(false)
-    setPasswordForm({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: ""
-    })
+    try {
+      const res = await handleChangePassword(
+        passwordForm.currentPassword,
+        passwordForm.newPassword
+      )
+      if (res.ok) {
+        // đóng form
+        setShowChangePassword(false)
+        setPasswordForm({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: ""
+        })
+      }
+    } catch (error) {
+      console.error("Error changing password:", error)
+      alert(error.response?.data?.error || "Lỗi server")
+    }
   }
+
+
 
   const handleDeleteAccount = async () => {
     if (confirm("Bạn có chắc muốn xóa tài khoản? Hành động này không thể hoàn tác.")) {
@@ -209,11 +214,11 @@ const AccountPage = () => {
 
         {/* Modal đổi mật khẩu */}
         {showChangePassword && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Đổi mật khẩu</h3>
 
-              <form onSubmit={handleChangePassword} className="space-y-4">
+              <form onSubmit={handleChangePassword1} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu hiện tại</label>
                   <input

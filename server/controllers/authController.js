@@ -5,7 +5,7 @@ const User = require("../models/User");
 // Đăng ký
 const register = async (req, res) => {
     try {
-        const { first_name, last_name, email, password } = req.body;
+        const { first_name, last_name, email, password, phone, city, district, ward, address } = req.body;
 
         // Kiểm tra email đã tồn tại chưa
         const existingUser = await User.getByEmail(email);
@@ -22,6 +22,11 @@ const register = async (req, res) => {
             last_name,
             email,
             password: hashedPassword,
+            phone,
+            city,
+            district,
+            ward,
+            address,
         });
 
         // Xóa password khỏi response
@@ -82,4 +87,22 @@ const logout = async (req, res) => {
     }
 };
 
-module.exports = { register, login, logout };
+// Đổi mật khẩu
+const changePassword = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { currentPassword, newPassword } = req.body;
+        const user = await User.getByIdPassword(userId);
+        if (!user) return res.status(404).json({ error: "User not found" });
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) return res.status(400).json({ error: "Current password is incorrect" });
+        const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+        await User.updatePassword(userId, hashedNewPassword);
+        res.status(200).json({ message: "Password changed successfully" });
+    } catch (error) {
+        console.error("Change password error:", error);
+        res.status(500).json({ error: "Server error" });
+    }
+};
+
+module.exports = { register, login, logout, changePassword };

@@ -2,7 +2,7 @@ const { VNPay, ignoreLogger, ProductCode, VnpLocale, dateFormat } = require('vnp
 const express = require('express');
 const router = express.Router();
 const Order = require('../../models/Order');
-module.exports = router;
+
 
 router.post('/create-qr', async (req, res) => {
     const { orderId, amount, orderInfor } = req.body;

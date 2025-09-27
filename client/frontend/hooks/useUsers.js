@@ -89,6 +89,23 @@ export const useUsers = () => {
         }
     };
 
+    const changePassword = async (currentPassword, newPassword) => {
+        setUsersError(null)
+        try {
+            const { data } = await api.post(
+                `${API_BASE_URL}/auth/change-password`,
+                { currentPassword, newPassword },
+                { headers: { Authorization: `Bearer ${token}` } }
+            )
+            return { success: true, data }
+        } catch (err) {
+            const message = err.response?.data?.error || "Error changing password"
+            setUsersError(message)
+            console.error("Error changing password:", err)
+            return { success: false, error: message }
+        }
+    }
+
     useEffect(() => {
         const user = JSON.parse(localStorage.getItem("currentUser"));
         if (user?.role === "admin") {
@@ -107,5 +124,6 @@ export const useUsers = () => {
         registerUser,
         updateUser,
         deleteUser,
+        changePassword
     };
 };

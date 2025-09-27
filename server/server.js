@@ -17,7 +17,10 @@ const orderRoutes = require('./routes/orderRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const discountRoutes = require('./routes/discountRoutes');
 const authRoutes = require('./routes/authRoutes');
-const vnpayRoute = require('./routes/payment/vnpayRoute');
+const vnpayRoutes = require('./routes/payment/vnpayRoutes');
+const momoRoutes = require('./routes/payment/momoRoutes');
+const zalopayRoutes = require('./routes/payment/zalopayRoutes');
+
 app.get('/', (req, res) => res.send("API is working"))
 
 // Sử dụng routes
@@ -30,7 +33,10 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/discounts', discountRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/payment/vnpay', vnpayRoute);
+app.use('/api/payment/vnpay', vnpayRoutes);
+app.use('/api/payment/momo', momoRoutes);
+app.use('/api/payment/zalopay', zalopayRoutes);
+
 // Get port from environment variables
 const PORT = process.env.PORT || 8081;
 

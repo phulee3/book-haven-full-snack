@@ -22,6 +22,14 @@ const User = {
         );
         return rows[0];
     },
+    async getByIdPassword(id) {
+        const [rows] = await db.query(
+            `SELECT id, email, password FROM users 
+       WHERE id = ? AND is_active = 1`,
+            [id]
+        );
+        return rows[0];
+    },
 
     // Lấy user theo email (login) — thường vẫn cần user active
     async getByEmail(email) {
@@ -53,6 +61,14 @@ const User = {
             [first_name, last_name, phone, city, district, ward, address, id]
         );
         return result.affectedRows > 0 ? { id, ...user } : null;
+    },
+
+    async updatePassword(id, hashedPassword) {
+        const [result] = await db.query(
+            `UPDATE users SET password = ? WHERE id = ?`,
+            [hashedPassword, id]
+        );
+        return result.affectedRows > 0;
     },
 
     // Xóa mềm user → set is_active = 0

@@ -78,7 +78,7 @@ export default function LoginModal({ isOpen, onClose }) {
                                 className="text-blue-600 hover:underline"
                                 onClick={() => setShowRegister(true)}
                             >
-                                Đăng ký oke Phu LE
+                                Đăng ký tài khoản
                             </button>
                         </div>
                     </form>

@@ -120,6 +120,18 @@ export const AppProvider = ({ children }) => {
         localStorage.removeItem("cart")
         authHook.handleLogout()
     }
+    const handleChangePassword = async (currentPassword, newPassword) => {
+        const result = await usersHook.changePassword(currentPassword, newPassword)
+        if (result.success) {
+            alert("Đổi mật khẩu thành công. Vui lòng đăng nhập lại.")
+            handleLogout() // logout ngay lập tức
+            return { ok: true }
+        } else {
+            alert(result.error || "Có lỗi xảy ra khi đổi mật khẩu")
+            return { ok: false }
+        }
+    }
+
 
     const handleUpdateUser = async (userId, userData) => {
         const updatedUser = await usersHook.updateUser(userId, userData)
@@ -196,6 +208,7 @@ export const AppProvider = ({ children }) => {
         handleLogin,
         handleLogout,
         handleRegister,
+        handleChangePassword,
         ...cartHook,
         cart: cartHook.cart,
         setCart: cartHook.setCart,
