@@ -79,6 +79,74 @@ const Checkout = ({ cart, getTotalPrice, createOrder, setCurrentPage, currentUse
     }
   }
 
+  // Hàm gọi BE tạo link thanh toán ZaloPay và redirect
+  async function createZaloPayPayment({ orderId, amount, orderInfo }) {
+    console.log("[ZALOPAY][createPayment] orderId:", orderId, "amount:", amount, "orderInfo:", orderInfo)
+    const res = await fetch("http://localhost:8081/api/payment/zalopay/create-qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId,
+        amount,
+        orderInfo
+      })
+    })
+    if (!res.ok) {
+      const txt = await res.text()
+      console.error("[ZALOPAY][createPayment] BE error body:", txt)
+      throw new Error("Tạo thanh toán ZaloPay thất bại")
+    }
+    const data = await res.json()
+    console.log("[ZALOPAY][createPayment] response:", data)
+    if (data.order_url) {
+      window.location.href = data.order_url
+    } else {
+      throw new Error("Không nhận được link thanh toán ZaloPay")
+    }
+  }
+
+  // Hàm gọi BE xác minh kết quả ZaloPay (sau redirect)
+  const verifyZaloPayReturn = async () => {
+    if (verifiedOnceRef.current) return
+    if (typeof window === "undefined") return
+    const search = window.location.search
+    console.log("[ZALOPAY][verify] window.location.search =", search)
+    const params = new URLSearchParams(search)
+    console.log("[ZALOPAY][verify] params.has('app_trans_id'):", params.has("app_trans_id"))
+    console.log("[ZALOPAY][verify] params.has('status'):", params.has("status"))
+    if (!params.has("app_trans_id") || !params.has("status")) {
+      console.log("[ZALOPAY][verify] Không có query ZaloPay -> bỏ qua")
+      return
+    }
+    verifiedOnceRef.current = true
+    setCheckingPayment(true)
+    try {
+      const query = params.toString()
+      console.log("[ZALOPAY][verify] Gửi GET:", `http://localhost:8081/api/payment/zalopay/check-payment-zalopay?${query}`)
+      const res = await fetch(`http://localhost:8081/api/payment/zalopay/check-payment-zalopay?${query}`, { method: "GET" })
+      let data
+      try {
+        data = await res.json()
+      } catch {
+        data = {}
+      }
+      console.log("[ZALOPAY][verify] Kết quả:", data)
+      if (res.ok && data.success) {
+        alert("Thanh toán ZaloPay thành công!")
+        // Điều hướng sang đơn hàng để user thấy cập nhật
+        navigate("/orders", { replace: true })
+      } else {
+        alert(data.message || "Thanh toán ZaloPay không thành công hoặc bị hủy.")
+      }
+    } catch (e) {
+      console.error("[ZALOPAY][verify] Lỗi:", e)
+      alert("Không xác minh được trạng thái thanh toán ZaloPay.")
+    } finally {
+      setCheckingPayment(false)
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }
+
   // Hàm gọi BE xác minh kết quả VNPAY (sau redirect)
   const verifyVnPayReturn = async () => {
     if (verifiedOnceRef.current) return
@@ -122,6 +190,7 @@ const Checkout = ({ cart, getTotalPrice, createOrder, setCurrentPage, currentUse
   // Tự động kiểm tra ngay khi component mount (trường hợp quay lại trang checkout)
   useEffect(() => {
     verifyVnPayReturn()
+    verifyZaloPayReturn()
   }, [])
 
   const handleSubmit = async (e) => {
@@ -176,7 +245,7 @@ const Checkout = ({ cart, getTotalPrice, createOrder, setCurrentPage, currentUse
       }
 
       // 4. Nếu COD / BANK / MOMO thì giữ flow cũ
-      if (paymentMethod !== "vnpay") {
+      if (paymentMethod !== "vnpay" && paymentMethod !== "zalopay") {
         alert(`Đặt hàng thành công! Mã đơn hàng: ${order.id}`)
         navigate("/orders", { replace: true })
         if (typeof setCurrentPage === "function") setCurrentPage("home")
@@ -185,6 +254,14 @@ const Checkout = ({ cart, getTotalPrice, createOrder, setCurrentPage, currentUse
 
       if (paymentMethod == "vnpay") {
         await createVNPayPayment({
+          orderId: order.id,
+          amount: order.total || payload.total_amount,
+          orderInfo: `Thanh toán đơn hàng ${order.id}`,
+        })
+      }
+
+      if (paymentMethod == "zalopay") {
+        await createZaloPayPayment({
           orderId: order.id,
           amount: order.total || payload.total_amount,
           orderInfo: `Thanh toán đơn hàng ${order.id}`,
@@ -334,7 +411,7 @@ const Checkout = ({ cart, getTotalPrice, createOrder, setCurrentPage, currentUse
             </div>
           </label>
 
-          {/* NEW: VNPAY */}
+          {/* VNPAY */}
           <label className="flex items-center">
             <input
               type="radio"
@@ -348,6 +425,24 @@ const Checkout = ({ cart, getTotalPrice, createOrder, setCurrentPage, currentUse
               <div className="font-medium">VNPAY</div>
               <div className="text-sm text-gray-600">
                 Thanh toán qua ví VNPAY
+              </div>
+            </div>
+          </label>
+
+          {/* ZALOPAY */}
+          <label className="flex items-center">
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="zalopay"
+              checked={paymentMethod === "zalopay"}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="mr-3"
+            />
+            <div>
+              <div className="font-medium">ZaloPay</div>
+              <div className="text-sm text-gray-600">
+                Thanh toán qua ví ZaloPay
               </div>
             </div>
           </label>
